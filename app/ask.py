@@ -22,10 +22,7 @@ DEFAULT_QUESTION = "AIE2026の講座の宿題にある「3レベル」とは何�
 TEMPERATURE = 1.0
 
 
-def ask(question: str) -> str:
-    client = genai.Client(api_key=get_api_key())
-    response = client.models.generate_content(model=MODEL, contents=question, config=types.GenerateContentConfig(temperature=TEMPERATURE))
-
+def print_usage(response) -> None:
     usage = response.usage_metadata
     if usage is not None:
         print(
@@ -33,16 +30,52 @@ def ask(question: str) -> str:
             f"output: {usage.candidates_token_count}"
         )
 
+
+def ask(question: str) -> str:
+    client = genai.Client(api_key=get_api_key())
+    response = client.models.generate_content(model=MODEL, contents=question, config=types.GenerateContentConfig(temperature=TEMPERATURE))
+
+    print_usage(response)
     return response.text
+
+
+def chat() -> None:
+    client = genai.Client(api_key=get_api_key())
+    session = client.chats.create(
+        model=MODEL,
+        config=types.GenerateContentConfig(temperature=TEMPERATURE),
+    )
+
+    print("会話モードです（終わるときは exit と入力）\n")
+    while True:
+        question = input("あなた> ").strip()
+        if question == "exit":
+            break
+        if not question:
+            continue
+
+        try:
+            response = session.send_message(question)
+        except errors.APIError as e:
+            print(api_error_message(e.code, e.message))
+            continue
+
+        print_usage(response)
+        print(f"AI> {response.text}\n")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="素のLLMに質問する")
     parser.add_argument("question", nargs="?", default=DEFAULT_QUESTION)
+    parser.add_argument("--chat", action="store_true", help="会話モードで続けて質問する")
+
     args = parser.parse_args()
 
     print(f"[model] {MODEL}")
     print(f"[temperature] {TEMPERATURE}")
+    if args.chat:
+        chat()
+        return
     print(f"[質問] {args.question}\n")
     try:
         print(ask(args.question))
